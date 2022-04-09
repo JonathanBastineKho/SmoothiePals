@@ -12,8 +12,8 @@ load_dotenv()
 # -------- GLOBAL VARIABLES -------- #
 
 TOKEN = os.getenv('DISCORD_TOKEN')
-GUILD = os.getenv('GUILD')
-RAFFLE = os.getenv('RAFFLE_ROLE')
+GUILD = int(os.getenv('GUILD'))
+RAFFLE = int(os.getenv('RAFFLE_ROLE'))
 DATABASE = os.getenv('DATABASE')
 
 # -------- DATABASE -------- #
@@ -46,11 +46,25 @@ db.create_all()
 
 intents = discord.Intents.default()
 intents.members = True
-bot = commands.Bot(command_prefix=',', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
     print("I am ready")
+
+    member_list = []
+    for guild in bot.guilds:
+        for member in guild.members:
+            member_list.append(member.id)
+
+    for i in Joined.query.all():
+        if i.joiner_id not in member_list:
+            joined_to_delete = Joined.query.filter_by(joiner_id=i.joiner_id).first()
+            inviter_to_decrease = joined_to_delete.inviter_id
+            totals_to_decrease = Totals.query.filter_by(inviter_id=inviter_to_decrease).first()
+            totals_to_decrease.left += 1
+            db.session.delete(joined_to_delete)
+            db.session.commit()
 
 async def setup():
     await bot.wait_until_ready()
@@ -78,7 +92,7 @@ async def on_member_join(member):
     for invite in invites:
         for old_invite in old_invites:
             if invite.id == old_invite.id and invite.uses - old_invite.uses > 0:
-                if not (y == member.created_at.year and m == member.created_at.month and d == member.created_at.day and h - member.created_at.hour <= 1):
+                if not (y == member.created_at.year and m == member.created_at.month and d == member.created_at.day and h - member.created_at.hour <= 7):
                     invite_to_update = Invites.query.filter_by(id=invite.id).first()
                     invite_to_update.uses += 1
                     total_to_update = Totals.query.filter_by(inviter_id=invite.inviter.id).first()
@@ -87,7 +101,7 @@ async def on_member_join(member):
                     role = bot.get_guild(GUILD).get_role(RAFFLE)
                     if total_to_update.normal - total_to_update.left >= 5 and role not in member.roles:
                         m = bot.get_guild(GUILD).get_member(invite.inviter.id)
-                        await m.add_roles(role) # --> Raffle role
+                        await m.add_roles(role) # --> int(RAFFLE role
 
                     if Joined.query.filter_by(inviter_id=invite.inviter.id).first() == None or Joined.query.filter_by(joiner_id=member.id).first() == None:
                         db.session.add(Joined(inviter_id=invite.inviter.id, joiner_id=member.id))
@@ -127,6 +141,37 @@ async def on_invite_create(invite):
 async def on_invite_delete(invite):
     db.session.delete(Invites.query.filter_by(id=invite.id).first)
     db.session.commit()
+
+@bot.command()
+async def invite(ctx, member=None):
+    m = None
+    if member == None:
+        m = bot.get_guild(GUILD).get_member_named(ctx.message.author.name)
+    else:
+        m = bot.get_guild(GUILD).get_member_named(member)
+    if m == None:
+        embed = discord.Embed(
+            title="Invite Statistics",
+            description=f"Sorry the member you requested has not created any invite links yet",
+            color=discord.Color.red()
+            )
+    else:
+        totals_to_display = Totals.query.filter_by(inviter_id=m.id).first()
+        embed = discord.Embed(
+            title="Invite Statistics",
+            description="Below data will show how many people you have invited to the server",
+            color=discord.Color.blue()
+            )
+        embed.set_author(name=m.name, icon_url=m.avatar_url)
+        embed.set_thumbnail(url="https://img.icons8.com/external-bearicons-flat-bearicons/64/000000/external-Invitation-christmas-and-new-year-bearicons-flat-bearicons.png")
+        embed.add_field(name=f"Total Invite: {totals_to_display.normal - totals_to_display.left}", inline=False, value=f"This is the total invites that {m.name} has")
+        embed.add_field(name=f"Joined: {totals_to_display.normal}", inline=True, value=f"This shows how many people joined via {m.name}'s links")
+        embed.add_field(name=f"Left: {totals_to_display.left}", inline=True, value=f"This shows how many people have left")
+        embed.add_field(name=f"Suspicious: {totals_to_display.fake}", inline=True, value="This is how many invites that we've think is suspicious")
+        date = datetime.today().strftime("%Y-%m-%d  %H:%M:%S (SGT)")
+        embed.set_footer(text=date)
+    
+    await ctx.send(embed=embed)
 
 bot.loop.create_task(setup())
 bot.run(TOKEN)
