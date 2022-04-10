@@ -1,4 +1,3 @@
-from enum import unique
 import time
 import sqlite3
 import discord
@@ -16,6 +15,7 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 GUILD = int(os.getenv('GUILD'))
 RAFFLE = int(os.getenv('RAFFLE_ROLE'))
 DATABASE = os.getenv('DATABASE')
+TEXT_CHANNEL = int(os.getenv('TEXT_CHANNEL'))
 
 # -------- DATABASE -------- #
 
@@ -151,6 +151,7 @@ async def on_invite_delete(invite):
 
 @bot.command()
 async def invite(ctx, member=None):
+    invite_text_channel = bot.guilds[0].get_channel(TEXT_CHANNEL)
     m = None
     if member == None:
         m = bot.get_guild(GUILD).get_member_named(ctx.message.author.name)
@@ -166,7 +167,7 @@ async def invite(ctx, member=None):
         totals_to_display = Totals.query.filter_by(inviter_id=m.id).first()
         embed = discord.Embed(
             title="Invite Statistics",
-            description="Below data shows how many people you have invited to the server",
+            description=f"Below data shows how many people {m.name} have invited to the server",
             color=discord.Color.blue()
             )
         embed.set_author(name=m.name, icon_url=m.avatar_url)
@@ -178,7 +179,16 @@ async def invite(ctx, member=None):
         date = datetime.today().strftime("%Y-%m-%d  %H:%M:%S (SGT)")
         embed.set_footer(text=date)
     
-    await ctx.send(embed=embed)
+    if int(ctx.channel.id) != TEXT_CHANNEL:
+        embed2 = discord.Embed(
+            title="Sorry",
+            description="Head Over to the invite log text channel",
+            color=discord.Color.red()
+        )
+        await ctx.send(embed=embed2)
+
+    await invite_text_channel.send(f"{ctx.message.author.mention}") 
+    await invite_text_channel.send(embed=embed)
 
 bot.loop.create_task(setup())
 bot.run(TOKEN)
