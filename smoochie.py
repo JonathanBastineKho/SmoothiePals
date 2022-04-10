@@ -1,8 +1,6 @@
-import time
-import sqlite3
 import discord
 from datetime import datetime
-from discord.ext import commands, tasks
+from discord.ext import commands
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -182,7 +180,7 @@ async def invite(ctx, member=None):
     if int(ctx.channel.id) != TEXT_CHANNEL:
         embed2 = discord.Embed(
             title="Sorry",
-            description="Head Over to the invite log text channel",
+            description="Head over to the invite-log text channel",
             color=discord.Color.red()
         )
         await ctx.send(embed=embed2)
