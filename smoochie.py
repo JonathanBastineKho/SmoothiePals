@@ -1,8 +1,9 @@
 from enum import unique
+import time
 import sqlite3
 import discord
 from datetime import datetime
-from discord.ext import commands 
+from discord.ext import commands, tasks
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -70,13 +71,18 @@ async def setup():
     await bot.wait_until_ready()
     for guild in bot.guilds:
         for invite in await guild.invites():
-
+            
             if Invites.query.filter_by(id=invite.id).first() == None:
                 db.session.add(Invites(id=invite.id, uses=invite.uses))
                 db.session.commit()
 
             if Totals.query.filter_by(inviter_id=invite.inviter.id).first() == None:
                 db.session.add(Totals(inviter_id=invite.inviter.id, normal=0, left=0, fake=0))
+                db.session.commit()
+        initial_invite = [invite.id for invite in await guild.invites()]
+        for i in db.session.query(Invites).all():
+            if i.id not in initial_invite:
+                db.session.delete(Invites.query.filter_by(id=i.id).first())
                 db.session.commit()
 
 @bot.event
@@ -99,7 +105,7 @@ async def on_member_join(member):
                     total_to_update.normal += 1
                     db.session.commit()
                     role = bot.get_guild(GUILD).get_role(RAFFLE)
-                    if total_to_update.normal - total_to_update.left >= 5 and role not in member.roles:
+                    if total_to_update.normal - total_to_update.left >= 2 and role not in member.roles:
                         m = bot.get_guild(GUILD).get_member(invite.inviter.id)
                         await m.add_roles(role) # --> int(RAFFLE role
 
@@ -125,9 +131,10 @@ async def on_member_remove(member):
 
     inviter_object = bot.get_guild(GUILD).get_member(inviter) # get_guild(guild ID)
     role = bot.get_guild(GUILD).get_role(RAFFLE)
-    if totals_to_update.normal - totals_to_update.left < 5 and role in inviter_object.roles:
+    if totals_to_update.normal - totals_to_update.left < 2 and role in inviter_object.roles:
         await inviter_object.remove_roles(role)
 
+@bot.event
 async def on_invite_create(invite):
     if Totals.query.filter_by(inviter_id=invite.inviter.id).first() == None:
         db.session.add(Totals(inviter_id=invite.inviter.id, normal=0, left=0, fake=0))
@@ -139,7 +146,7 @@ async def on_invite_create(invite):
 
 @bot.event
 async def on_invite_delete(invite):
-    db.session.delete(Invites.query.filter_by(id=invite.id).first)
+    db.session.delete(Invites.query.filter_by(id=invite.id).first())
     db.session.commit()
 
 @bot.command()
@@ -159,15 +166,15 @@ async def invite(ctx, member=None):
         totals_to_display = Totals.query.filter_by(inviter_id=m.id).first()
         embed = discord.Embed(
             title="Invite Statistics",
-            description="Below data will show how many people you have invited to the server",
+            description="Below data shows how many people you have invited to the server",
             color=discord.Color.blue()
             )
         embed.set_author(name=m.name, icon_url=m.avatar_url)
         embed.set_thumbnail(url="https://img.icons8.com/external-bearicons-flat-bearicons/64/000000/external-Invitation-christmas-and-new-year-bearicons-flat-bearicons.png")
-        embed.add_field(name=f"Total Invite: {totals_to_display.normal - totals_to_display.left}", inline=False, value=f"This is the total invites that {m.name} has")
-        embed.add_field(name=f"Joined: {totals_to_display.normal}", inline=True, value=f"This shows how many people joined via {m.name}'s links")
-        embed.add_field(name=f"Left: {totals_to_display.left}", inline=True, value=f"This shows how many people have left")
-        embed.add_field(name=f"Suspicious: {totals_to_display.fake}", inline=True, value="This is how many invites that we've think is suspicious")
+        embed.add_field(name=f"Total Invite: {totals_to_display.normal - totals_to_display.left}", inline=False, value=f"Number of invites that {m.name} has")
+        embed.add_field(name=f"Joined: {totals_to_display.normal}", inline=True, value=f"Number of members joined via {m.name}'s link")
+        embed.add_field(name=f"Left: {totals_to_display.left}", inline=True, value=f"Number of members who left")
+        embed.add_field(name=f"Suspicious: {totals_to_display.fake}", inline=True, value="Number of Sus invites")
         date = datetime.today().strftime("%Y-%m-%d  %H:%M:%S (SGT)")
         embed.set_footer(text=date)
     
