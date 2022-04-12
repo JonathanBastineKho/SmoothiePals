@@ -155,7 +155,7 @@ async def invite(ctx, member=None):
         m = bot.get_guild(GUILD).get_member_named(ctx.message.author.name)
     else:
         m = bot.get_guild(GUILD).get_member_named(member)
-    if m == None:
+    if m == None or Totals.query.filter_by(inviter_id=m.id).first() == None:
         embed = discord.Embed(
             title="Invite Statistics",
             description=f"Sorry the member you requested has not created any invite links yet",
@@ -179,7 +179,7 @@ async def invite(ctx, member=None):
     
     if int(ctx.channel.id) != TEXT_CHANNEL:
         embed2 = discord.Embed(
-            title="Sorry",
+            title="Hey",
             description="Head over to the invite-log text channel",
             color=discord.Color.red()
         )
