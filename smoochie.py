@@ -103,7 +103,7 @@ async def on_member_join(member):
                     total_to_update.normal += 1
                     db.session.commit()
                     role = bot.get_guild(GUILD).get_role(RAFFLE)
-                    if total_to_update.normal - total_to_update.left >= 2 and role not in member.roles:
+                    if total_to_update.normal - total_to_update.left >= 1 and role not in member.roles:
                         m = bot.get_guild(GUILD).get_member(invite.inviter.id)
                         await m.add_roles(role) # --> int(RAFFLE role
 
@@ -129,7 +129,7 @@ async def on_member_remove(member):
 
     inviter_object = bot.get_guild(GUILD).get_member(inviter) # get_guild(guild ID)
     role = bot.get_guild(GUILD).get_role(RAFFLE)
-    if totals_to_update.normal - totals_to_update.left < 2 and role in inviter_object.roles:
+    if totals_to_update.normal - totals_to_update.left < 1 and role in inviter_object.roles:
         await inviter_object.remove_roles(role)
 
 @bot.event
