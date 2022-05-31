@@ -108,6 +108,7 @@ async def on_member_join(member):
                         await m.add_roles(role) # --> int(RAFFLE role
 
                     if Joined.query.filter_by(inviter_id=invite.inviter.id).first() == None or Joined.query.filter_by(joiner_id=member.id).first() == None:
+                        print(datetime.today().strftime("%Y-%m-%d-%H-%S") + " added Joined")
                         db.session.add(Joined(inviter_id=invite.inviter.id, joiner_id=member.id))
                         db.session.commit()
                 else:
